@@ -43,4 +43,6 @@ target/
 
 .idea
 *.iml
-/dars-reporting-rest-server/nbproject/
+
+# LibreOffice
+.~lock.*
