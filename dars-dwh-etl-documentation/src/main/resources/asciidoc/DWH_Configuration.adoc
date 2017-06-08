@@ -1,0 +1,616 @@
+= Configuration of the TDP data warehouse
+Jeffrey Zelt <jeffrey.zelt@q-free.com>
+
+== Summary
+After all software packages are installed for implementing a data warehouse 
+(DWH) for the TDP, there are some installation-specific configuration tasks to 
+perform. This involves:
+
+* Choosing values for Q-Free configuration parameters for:
+. Database connections
+. Logging data retention
+. E-mail notification
+//. TDP star schema data mart setup
+. Postgresql `psql` utility location
+
+* Choosing values for customer (end-user) configuration parameters for:
+. SMTP server
+. E-mail notification
+
+* Setting environment variables for the "etl" account
+* Running ETL jobs (and scheduling them)
+* Customization of logging details
+
+== Q-Free configuration parameters
+
+"Q-Free" configuration parameters are parameters whose values must be chosen by
+Q-Free. These are values should also not be visible to the customer, as they may 
+reveal details that are either confidential or details that are irrelevant to 
+the goals of the customer.
+
+These parameters are stored in a file named `dwh-qfree.properties`, which is
+stored here:
+
+ /etc/dwh/dwh-etl/q-free/dwh-qfree.properties
+
+Values must be set appropriately for all parameters (referred to as "properties"
+in Java) in this file before any ETL script can be executed for loading or
+updating the DWH.
+
+The following table lists the parameters in `dwh-qfree.properties`, together 
+with a representative
+or default value and a short description of what the parameter value 
+represents. Do not assume that the example values provided here will match your
+environment. 
+
+.Q-Free configuration parameters (dwh-qfree.properties)
+|===
+|Name |Example value |Description
+
+3+|
+
+3+|__TDP archive database. This database provides the source data for the DWH:__
+
+|*DWH_TDP_ARCHIVE_DB_HOST* |<someserver>.q-free.com |Hostname of the server that is hosting the TDP archive database.
+|*DWH_TDP_ARCHIVE_DB_PORT* |5432 |TCP port for connections to the TDP archive database.
+|*DWH_TDP_ARCHIVE_DB_DATABASE* |Archive |Name of the TDP archive database.
+|*DWH_TDP_ARCHIVE_DB_USERNAME* |adam |Username for for connections to the TDP archive database.
+|*DWH_TDP_ARCHIVE_DB_PASSWORD* |_<somepassword>_ |Password for for connections to the TDP archive database.
+
+3+|
+
+3+|__TDP archive mirror database. The customer should be provided with the credentials of a 
+PostgreSQL role that has SELECT access to the tables in the SQL schemas of this database. 
+This database can be the same as the ETL database that is configured below provided 
+that different SQL schemas are specified.__
+
+|*DWH_TDP_MIRROR_DB_HOST* |localhost |Hostname of the server that is hosting the mirror database.
+|*DWH_TDP_MIRROR_DB_PORT* |5432 |TCP port for connections to the mirror archive database.
+|*DWH_TDP_MIRROR_DB_DATABASE* |dwh_tdp_db |Name of the mirror database.
+|*DWH_TDP_MIRROR_DB_USERNAME* |etl |Username for for connections to the mirror database.
+|*DWH_TDP_MIRROR_DB_PASSWORD* |etl |Password for for connections to the mirror database.
+
+//3+|
+//
+//3+|__TDP data mart database. The customer should be provided with the credentials 
+//of a PostgreSQL role that has SELECT access to the tables in the SQL schema of 
+//this database.  This database can be the same as the TDP archive mirror database
+//that is configured above since different SQL schemas can be specified.__
+//
+//|*DWH_TDP_DMA_DB_HOST* |localhost |Hostname of the server that is hosting the TDP data mart database.
+//|*DWH_TDP_DMA_DB_PORT* |5432 |TCP port for connections to the TDP data mart database.
+//|*DWH_TDP_DMA_DB_DATABASE* |dwh_tdp_db |Name of the TDP data mart database.
+//|*DWH_TDP_DMA_DB_USERNAME* |etl |Username for for connections to the TDP data mart database.
+//|*DWH_TDP_DMA_DB_PASSWORD* |etl |Password for for connections to the TDP data mart database.
+//|*DWH_TDP_DMA_DB_SCHEMA* |dma |Name of SQL schema containing the TDP data mart tables. These 
+//tables will represent facts and dimensions. The customer will be given SELECT
+//permission for the tables in this schema. The data in these tables can be used
+//for generating reports, performing analysis, etc.
+
+3+|
+
+3+|__ETL database. The tables in this database are used to support the ETL 
+operations for updating and maintaining the DWH. The customer should not be 
+given access to these tables. This database can be the same as the TDP archive 
+mirror 
+//or data mart databases that are configured above since different SQL 
+               database  that is  configured above since different SQL 
+schemas can be specified.__
+
+|*DWH_TDP_ETL_DB_HOST* |localhost |Hostname of the server that is hosting the ETL database.
+|*DWH_TDP_ETL_DB_PORT* |5432 |TCP port for connections to the ETL database.
+|*DWH_TDP_ETL_DB_DATABASE* |dwh_tdp_db |Name of the ETL database.
+|*DWH_TDP_ETL_DB_USERNAME* |etl |Username for for connections to the ETL database.
+|*DWH_TDP_ETL_DB_PASSWORD* |etl |Password for for connections to the ETL database.
+|*DWH_TDP_ETL_DB_SCHEMA* |etl |Name of SQL schema containing the ETL support tables
+
+3+|
+
+3+|__Logging database. All logging tables are placed in the "etl" schema; this is 
+not currently configurable. These tables used to support logging for the ETL 
+operations. The customer should not be given access to these tables. This 
+database can be the same as the other databases that are configured above.__
+
+|*DWH_TDP_LOGGING_DB_HOST* |localhost |Hostname of the server that is hosting the logging database.
+|*DWH_TDP_LOGGING_DB_PORT* |5432 |TCP port for connections to the logging archive database.
+|*DWH_TDP_LOGGING_DB_DATABASE* |dwh_tdp_db |Name of the logging database.
+|*DWH_TDP_LOGGING_DB_USERNAME* |etl |Username for for connections to the logging database.
+|*DWH_TDP_LOGGING_DB_PASSWORD* |etl |Password for for connections to the logging database.
+
+3+|
+
+3+|__Number of days to retain rows inserted into the various logging tables:__
+
+|*DWH_TDP_LOG_JOB_TIMEOUT_IN_DAYS* |750 |This table logs data for PDI 
+jobs that have been executed by the ETL scripts.
+
+|*DWH_TDP_LOG_JOBENTRY_TIMEOUT_IN_DAYS* |180 |This table logs data for PDI job 
+entries.
+
+|*DWH_TDP_LOG_CHANNEL_TIMEOUT_IN_DAYS* |180 |This table logs PDI logging channel 
+data. This is used to connect log entries between jobs, job entries, 
+transformations, transformation steps and transformation metrics.
+
+|*DWH_TDP_LOG_TRANS_TIMEOUT_IN_DAYS* |750 |This table logs data for PDI 
+transformations that have been executed by the ETL scripts.
+
+|*DWH_TDP_LOG_TRANSSTEP_TIMEOUT_IN_DAYS* |180 |This table logs data for PDI 
+transformation steps.
+
+|[small]#*DWH_TDP_LOG_TRANSPERFORMANCE_TIMEOUT_IN_DAYS*# |180 |This table logs
+transformation performance data.
+
+|[small]#*DWH_TDP_LOG_TRANSMETRICS_TIMEOUT_IN_DAYS*# |180 |This table logs
+transformation metrics data.
+
+3+|
+
+3+|__E-mail details for messages sent to a Q-Free recipient:__
+
+|*DWH_QF_MAIL_MSG_ADDRESS_TO* | someone@q-free.com|E-mail address, 
+comma-separate list of addresses, or a distribution list to send the e-mail to.
+If this is empty, no e-mail will be sent.
+
+|*DWH_QF_MAIL_MSG_ADDRESS_CC* | |E-mail address, comma-separate list of 
+addresses, or a distribution list to send a carbon copy of the e-mail to.
+
+|*DWH_QF_MAIL_MSG_ADDRESS_BCC* | |E-mail address, comma-separate list of 
+addresses, or a distribution list to send a blind carbon copy of the e-mail to. 
+
+|*DWH_QF_MAIL_MSG_SENDER_NAME* |Q-Free DWH TDP ETL process |The name of the 
+person or account that the e-mail should appear to come from.
+
+|*DWH_QF_MAIL_MSG_SENDER_ADDRESS* |dwh-etl@q-free.com |The e-mail address of the 
+person or account that the e-mail should appear to come from. 
+
+|*DWH_QF_MAIL_MSG_REPLY_TO_ADDRESS* |some-service-address@q-free.com |The e-mail 
+address that a recipient should use to reply to the e-mail. 
+
+|*DWH_QF_MAIL_MSG_CONTACT_PERSON* | |The name of the person to contact regarding 
+the content of the e-mail sent. 
+
+|*DWH_QF_MAIL_MSG_CONTACT_PHONE* | |The phone number of the contact person.
+
+|*DWH_QF_MAIL_MSG_SUBJECT_SUCCESS* |Successful execution: DWH TDP job "${PARAM_JOB_NAME}"
+|Template for the e-mail subject for the notification of a successfully executed PDI job.
+
+|*DWH_QF_MAIL_MSG_SUBJECT_FAILURE* |FAILED EXECUTION: DWH TDP job "${PARAM_JOB_NAME}"
+|Template for the e-mail subject for the notification of a failed PDI job.
+
+|*DWH_QF_MAIL_MSG_BODY_SUCCESS* |The job "${PARAM_JOB_NAME}" executed 
+successfully.${line.separator}Job ID = ${PARAM_JOB_BATCH_ID}
+|Template for the e-mail body for the notification of a successfully executed PDI job.
+
+|*DWH_QF_MAIL_MSG_BODY_FAILURE* |[small]#The job "${PARAM_JOB_NAME}" failed.${line.separator}
+Job ID = ${PARAM_JOB_BATCH_ID} ${line.separator}${line.separator}
+${DWH_QF_MAIL_BODY_FAILURE_ADDITIONAL_INFO}# |
+Template for the e-mail body for the notification of a failed PDI job.
+//
+//3+|
+//
+//3+|__TDP star schema data mart setup:__
+//
+//|*DWH_TDP_DMA_DIM_DATE_YEAR_MIN* |2016 |The date dimension will start on January 1 of this year.
+//|*DWH_TDP_DMA_DIM_DATE_YEAR_MAX* |2025 |The date dimension will end on December 31 of this year.
+//
+//|[small]#*DWH_TDP_DMA_DIM_TIME_RESOLUTION_SECONDS*# |1 |The resolution in seconds of the 
+//time dimension. This must either divide exactly into the the number of seconds 
+//in a minute (60) or be a multiple of 60, and at the same time it must either 
+//divide exactly into the the number of seconds in an hour (3600) or be a multiple 
+//of 3600.
+//
+//|*DWH_TDP_DMA_LOCALE_LANGUAGE_CODE* |en |The two-letter
+//http://www.loc.gov/standards/iso639-2/php/code_list.php[ISO 639-1] language code 
+//to use with the data mart. This is used together with the country code to 
+//specify a locale that is used to generate locale-specific strings, e.g., days 
+//names, month names, etc. Examples are: "*nb*" (Norwegian Bokmål), "*en*" 
+//(English), etc.
+//
+//|*DWH_TDP_DMA_LOCALE_COUNTRY_CODE* |us |The two-letter 
+//https://www.iso.org/obp/ui/[ISO 3166-1] country code to use
+//with the data mart. This is used together with the language code to specify a
+//locale that is used to generate locale-specific strings, e.g., days names, month
+//names, etc. Examples are: "*no*" (Norway), "*us*" (United States of America), 
+//etc.
+
+3+|
+
+3+|__Miscellaneous:__
+
+|*DWH_POSTGRESQL_BULK_LOADER_PSQL_PATH* |/usr/bin/psql |The absolute path to the 
+PostgreSQL "psql" tool on the local machine. This is used by the PostgreSQL Bulk 
+Loader transformation step.
+|===
+
+=== Updating the master configuration file
+
+After the configuration parameters in the file dwh-qfree.properties are
+modified, it is necessary to synchronize these values with the master 
+configuration file that is used by all PDI applications. This is performed by
+an application named `dwh_merge_local_properties.jar` that you will find here:
+
+ /opt/dwh/dwh-etl/pdi_config/dwh_merge_local_properties.jar
+
+This should be executed as user "etl" from a shell as follows:
+
+ $ sudo -iu etl
+ $ java -jar /opt/dwh/dwh-etl/pdi_config/dwh_merge_local_properties.jar
+
+or:
+
+ $ sudo -iu etl java -jar /opt/dwh/dwh-etl/pdi_config/dwh_merge_local_properties.jar
+
+This will write the list of *all* parameter settings from the master 
+configuration file (after the new parameter settings are merge in) to stdout.
+This list is for information only. You can safely ignore it, but you can also 
+use it to double check that the parameters that you specified have been updated
+correctly in the master configuration file.
+
+IMPORTANT: If you forget to run `dwh_merge_local_properties.jar`, all ETL 
+scripts will continue to use the old parameter values.
+
+
+== Customer (end-user) configuration parameters
+
+"Customer" configuration parameters are parameters whose values can be specified 
+by the customer (end-user). 
+
+These parameters are stored in a file named `dwh.properties`, which is
+stored here:
+
+ /etc/dwh/dwh-etl/config/dwh.properties
+
+Values should be set appropriately for all parameters in this file before any 
+ETL script is be executed for loading or updating the DWH.
+
+It is conceivable that the customer could be given access to this file so that
+the customer can maintain the values themselves. For this reason, a separate
+file is provided for these parameter and it is placed in a different directory
+than the other configuration file, `dwh-qfree.properties`. If this is not
+desired or practical, then this file can be maintained by Q-Free.
+
+The following table lists the parameters in `dwh.properties`, together with 
+a representative
+or default value and a short description of what the parameter value 
+represents. Do not assume that the example values provided here will match your
+environment. 
+
+.Customer configuration parameters (dwh.properties)
+|===
+|Name |Example value |Description
+
+3+|
+
+3+|__E-mail server (e.g., for delivering mail to notify of successful or failed ETL jobs):__
+
+|*DWH_MAIL_SERVER_HOST* |smtp.company.com |Hostname, or IP address of the SMTP server to use for sending e-mail.
+|*DWH_MAIL_SERVER_PORT* |25 |TCP port of the SMTP service. 
+|*DWH_MAIL_SERVER_USE_AUTHENTICATION* |false |"true" if server authentication is required; "false" otherwise.
+|*DWH_MAIL_SERVER_AUTHENTICATION_USER* | |The SMTP username to use if server authentication is required. 
+|*DWH_MAIL_SERVER_AUTHENTICATION_PASSWORD* | |The password for the SMTP username
+
+|*DWH_MAIL_SERVER_SECURE_CONNECTION_TYPE* | 
+|Encryption protocol to use for server authentication. Must be one of "", "SSL" or "TLS".
+
+3+|
+
+3+|__E-mail details for messages sent to the customer:__
+
+|*DWH_MAIL_MSG_ADDRESS_TO* | |E-mail address, 
+comma-separate list of addresses, or a distribution list to send the e-mail to.
+If this is empty, no e-mail will be sent.
+
+|*DWH_MAIL_MSG_ADDRESS_CC* | |E-mail address, comma-separate list of 
+addresses, or a distribution list to send a carbon copy of the e-mail to.
+
+|*DWH_MAIL_MSG_ADDRESS_BCC* | |E-mail address, comma-separate list of 
+addresses, or a distribution list to send a blind carbon copy of the e-mail to. 
+
+|*DWH_MAIL_MSG_SENDER_NAME* |Q-Free DWH TDP ETL process |The name of the 
+person or account that the e-mail should appear to come from.
+
+|*DWH_MAIL_MSG_SENDER_ADDRESS* |dwh-etl@q-free.com |The e-mail address of the 
+person or account that the e-mail should appear to come from. 
+
+|*DWH_MAIL_MSG_REPLY_TO_ADDRESS* |some-service-address@q-free.com |The e-mail 
+address that a recipient should use to reply to the e-mail. 
+
+|*DWH_MAIL_MSG_CONTACT_PERSON* | |The name of the person to contact regarding 
+the content of the e-mail sent. 
+
+|*DWH_MAIL_MSG_CONTACT_PHONE* | |The phone number of the contact person.
+
+|*DWH_MAIL_MSG_SUBJECT_SUCCESS* |Successful execution: DWH TDP job "${PARAM_JOB_NAME}"
+|Template for the e-mail subject for the notification of a successfully executed PDI job.
+
+|*DWH_MAIL_MSG_SUBJECT_FAILURE* |FAILED EXECUTION: DWH TDP job "${PARAM_JOB_NAME}"
+|Template for the e-mail subject for the notification of a failed PDI job.
+
+|*DWH_MAIL_MSG_BODY_SUCCESS* |The job "${PARAM_JOB_NAME}" executed successfully.
+|Template for the e-mail body for the notification of a successfully executed PDI job.
+
+|*DWH_MAIL_MSG_BODY_FAILURE* |The job "${PARAM_JOB_NAME}" failed.
+|Template for the e-mail body for the notification of a failed PDI job.
+|===
+
+=== Updating the master configuration file
+
+After the configuration parameters in the file dwh.properties are
+modified, it is necessary to synchronize these values with the master 
+configuration file that is used by all PDI applications. The procedure is 
+exactly the same as that for the dwh-qfree.properties file above, i.e.,
+
+ $ sudo -iu etl
+ $ java -jar /opt/dwh/dwh-etl/pdi_config/dwh_merge_local_properties.jar
+
+or:
+
+ $ sudo -iu etl java -jar /opt/dwh/dwh-etl/pdi_config/dwh_merge_local_properties.jar
+
+IMPORTANT: If you forget to run `dwh_merge_local_properties.jar`, all ETL 
+scripts will continue to use the old parameter values.
+
+The application `dwh_merge_local_properties.jar` merges, in fact, *_both_* of the
+files `dwh-qfree.properties` and `dwh.properties` with the master 
+configuration file. Therefore, if you need to modify both `dwh-qfree.properties` 
+and `dwh.properties`, you can wait and run `dwh_merge_local_properties.jar` just
+once after these changes are made.
+
+
+== Setting environment variables for the "etl" account
+
+The home directory of the "etl" Linux account, `/home/etl/` will contain a file 
+named `.profile`. It will initially contain the following:
+
+....
+# These environment variables must be set so that the PDI ETL scripts function
+# correctly for the "etl" user. These scripts are located in:
+#
+# /opt/dwh/dwh-etl/scripts/
+#
+# The scripts in this directory can either be executed manually is a shell, 
+# e.g.,
+#
+#   $ $DWH_HOME/scripts/dwh_tdp_update.sh
+#
+# or they can be run by cron according to a schedule that you set in the file:
+#
+#   /etc/cron.d/dwh-etl
+
+export DWH_HOME=/opt/dwh/dwh-etl
+export DWH_LOGDIR=$DWH_HOME/logging
+export KETTLE_HOME=$DWH_HOME/pdi_config
+export KETTLE_JNDI_ROOT=$DWH_HOME/pdi_config/simple_jndi
+
+# If you encounter Java-related problems, uncomment these two lines, but make
+# sure that you set JAVA_HOME to the location of *your* JRE 8 installation. 
+#
+# This will likely be necessary if you have multiple JRE versions installed, but
+# but JRE 8 is *not* the default version. This will make it the default version
+# for the "etl" user.
+#
+#export JAVA_HOME=/usr/lib/jvm/java-8-oraclejdk-amd64
+#export PATH=$JAVA_HOME/bin:$PATH
+....
+
+Be sure to read the comments that describe the environment variables `JAVA_HOME`
+and `PATH`. 
+
+After you modify `.profile`, source the file to ensure that the changes are 
+used:
+
+ $ source .profile
+
+
+== Running ETL jobs
+
+The files in the PDI repository directory,
+
+ /opt/dwh/dwh-etl/pdi_repository/
+
+define a series of ETL jobs for managing the TDP data warehouse. These jobs are
+executed via the shell scripts stored in the directory:
+
+ /opt/dwh/dwh-etl/scripts/
+
+These scripts are described in the document 
+"Installation of the TDP data warehouse". 
+
+// This comment block can replace the block following it if/when we re-enable the data mart:
+////
+There are currently three scripts that can be run:
+....
+dwh_tdp_mirrored_tables-update.sh
+dwh_tdp_data_mart-update.sh
+dwh_tdp_update.sh
+....
+////
+There are currently two scripts that can be run:
+....
+dwh_tdp_mirrored_tables-update.sh
+dwh_tdp_update.sh
+....
+
+=== Manual execution of ETL jobs
+
+In order to manually execute one of these scripts, e.g., 
+`scripts/dwh_tdp_update.sh` from the "etl" account, use:
+
+ $ $DWH_HOME/scripts/dwh_tdp_update.sh
+ 
+where the first `$` refers to the shell prompt character.
+ 
+A script can also be executed from an account other than "etl", but the syntax 
+is slightly different. In this case use:
+ 
+ $ sudo -iu etl '$DWH_HOME'/scripts/dwh_tdp_update.sh
+
+Here, the `-i` option and the single quotes around `$DWH_HOME` are essential.
+
+
+=== Scheduling ETL jobs
+
+The easiest way to schedule an ETL job is to use the Linux "cron" scheduler.
+
+When the `dwh-etl_<version>.deb` package is first installed, a file 
+named `dwh-etl` is installed here:
+
+ /etc/cron.d/dwh-etl
+
+This file can be used to schedule ETL scripts with the `cron` scheduler. This 
+file will initially contain the following content:
+
+....
+SHELL=/bin/sh
+PATH=/usr/local/bin:/bin:/usr/bin
+
+#0 2 * * *	etl	. $HOME/.profile && $DWH_HOME/scripts/dwh_tdp_update.sh
+....
+
+The last line can be used to schedule the execution of the script
+`dwh_tdp_update.sh`. The "#" character in the first 
+column means that the line is commented out, i.e., it is inactive. 
+
+To activate this line so that cron will run the script according to the 
+specified schedule, just remove the "#" character. It is not necessary to
+restart cron or perform any other action.
+
+The default schedule is `0 2 * * *`, which will run the script each morning 
+at 2 a.m. There is nothing special about this schedule - change it to suit your
+needs.
+
+TIP: Unschedule ETL cron jobs if they are scheduled to run while either the TDP 
+archive database or the TDP data warehouse database is unavailable.
+
+
+==== E-mail notification from ETL jobs
+
+Whether ETL jobs are run manually from the command line or scheduled to run
+automatically, they can be configured to deliver an email to both a Q-Free
+contact as well as a customer contact to report success or failure of the job.
+See the sections "Q-Free configuration parameters" and 
+"Customer (end-user) configuration parameters" above for the necessary 
+configuration details.
+
+NOTE: Job notification e-mails will currently be only delivered to the Q-Free
+address that is configured above. Support for also sending a notification to
+the customer-configured e-mail address may be added in the future.
+	
+If there is a serious configuration problem, no e-mail will be sent at all. This 
+case can be discovered by:
+
+. Monitoring the log file. See "Logging" below.
+. Noticing that no e-mail has arrived when one should have arrived.
+
+==== ETL script mutex lock
+
+Each ETL script implements the same mutex lock to prevent the same script or
+two different scripts from running simultaneously. This prevents 
+simultaneous access to objects that can lead to unexpected results. It also 
+prevents an unrealistic demand for server resources. The PDI jobs that are 
+triggered by the shell scripts are highly multi-threaded. It is not clear that
+throughput can be improved by running two or more jobs simultaneously; in fact, 
+this could easily have the opposite effect.
+
+If a script is not able to acquire the necessary lock, it will terminate
+immediately. It will not wait for the lock to become free. The log file will
+record this event if if occurs.
+
+TIP: If, for some reason, the lock does not get removed automatically after a 
+script runs, you can delete it manually. The lock is implemented by a directory
+in the file system of the Linux host: `/tmp/dwh_tdp-lock/` .
+
+
+// This comment block can replace the block following it if/when we re-enable the data mart:
+////
+If you do want to schedule more than one script to run on the same schedule, 
+write a custom wrapper shell script that simply calls the ETL scripts in 
+sequence. Schedule this wrapper script with cron. For example, to run two
+scripts named `dwh_tdp_mirrored_tables-update.sh` and `dwh_tdp_data_mart-update.sh` 
+on the same schedule, write a script named, e.g., `wrapper.sh` that contains:
+
+ #!/bin/sh
+ $DWH_HOME/scripts/dwh_tdp_mirrored_tables-update.sh
+ $DWH_HOME/scripts/dwh_tdp_data_mart-update.sh
+
+Note that this example is presented here only to demonstrate the recommended way
+to execute two ETL scripts. The provided script `dwh_tdp_update.sh` includes the 
+functionality provided by `dwh_tdp_mirrored_tables-update.sh` and 
+`dwh_tdp_data_mart-update.sh`, and so it can be used instead of implementing 
+this example.
+////
+
+If you do want to schedule more than one script to run on the same schedule, 
+write a custom wrapper shell script that simply calls the ETL scripts in 
+sequence. Schedule this wrapper script with cron. For example, to run two
+scripts named `dwh_tdp_mirrored_tables-update.sh` and `dwh_tdp_another_script.sh` 
+on the same schedule, write a script named, e.g., `wrapper.sh` that contains:
+
+ #!/bin/sh
+ $DWH_HOME/scripts/dwh_tdp_mirrored_tables-update.sh
+ $DWH_HOME/scripts/dwh_tdp_another_script.sh
+
+
+The script`wrapper.sh` must be made executable with:
+
+ $ chmod +x wrapper.sh
+
+Assuming that `wrapper.sh` is stored in the `scripts/` directory, it can be
+scheduled with cron by placing the following line in `/etc/cron.d/dwh-etl`:
+
+ 0 2 * * *	etl	. $HOME/.profile && $DWH_HOME/scripts/wrapper.sh
+
+Again, the schedule "`0 2 * * *`" can be changed to suit your needs. This will
+prevent any lock contention between the two wrapped ETL scripts.
+
+IMPORTANT: Do not schedule more than one ETL script on the same or similar
+schedule. Because of lock contention, only one will run.
+
+
+== Logging
+
+By default, all ETL scripts will write logging information to a file named 
+`dwh.log` in the directory:
+
+ /opt/dwh/dwh-etl/logging/
+
+When the "etl" account is first created, an environment variable named 
+`DWH_LOGDIR` is defined in `~etl/.profile` with the value:
+
+ DWH_LOGDIR=$DWH_HOME/logging
+
+where:
+
+ DWH_HOME=/opt/dwh/dwh-etl
+
+This environment variable value is responsible for `dwh.log` being written to 
+this directory. If you would prefer the log file `dwh.log` to be written to 
+another directory, e.g., 
+
+ /var/log/dwh-etl/
+
+or
+
+ /var/log/dwh/
+
+it is only a matter of creating this directory with the appropriate permissions 
+so that the "etl" account can write to it, and then updating the value of 
+`DWH_LOGDIR` in `~etl/.profile`
+
+There are also seven tables in the DWH database where very detailed logging 
+information is written, but they will not be described here.
+
+Assuming that you have logged into the "etl" account or have switched to it 
+from another account using `sudo su - etl`, you can monitor the log file as it
+is being written to via ETL scripts with:
+
+ $ tail -F $DWH_LOGDIR/dwh.log
+
+This command will still work if you change DWH_LOGDIR to specify a directory in
+`/var/log/` or anywhere else.
+
+IMPORTANT: Regardless of where the log file `dwh.log` is written, it will not be 
+automatically truncated or rotated. The file will continue to grow without 
+bound. If you would like to automate the rotation of this log file and to
+automatically delete old log files, use a tool designed for this purpose, such
+as the `logrotate` utility, which is available in most Linux distributions.

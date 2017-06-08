@@ -1,0 +1,102 @@
+== Release notes for package dwh-etl-1.6.0.deb
+
+. <<1.6.0-RN1>>
+. <<1.6.0-RN2>>
+
+IMPORTANT: Remember that after *_every_* new release is installed, it is 
+necessary to synchronize your local configuration parameters with the master 
+configuration file that is used by all PDI applications. See the
+upgrade manual, "Upgrading the Q-Free ETL toolkit for the TDP data warehouse", 
+for full details. This step is necessary after an upgrade *_regardless_* of 
+whether you manually edit your local configuration files or not.
+ 
+== Release notes for package dwh-etl-1.6.0.deb
+
+[id="1.6.0-RN1"]
+=== How to reduce the size of the logging tables
+
+The ETL scripts write logging information to seven tables in the "etl" schema.
+These tables are:
+
+	log_channel
+	log_jobs
+	log_job_entries
+	log_transformations
+	log_transformation_steps
+	log_transformation_performance
+	log_transformation_metrics
+
+If the size of any of these tables grow beyond what your storage can handle,
+the retention time for this data can be reduced. To do this, follow this
+procedure:
+
+. Edit the following file as user "etl":
++
+ /etc/dwh/dwh-etl/q-free/dwh-qfree.properties
++
+In order to reduce the retention time for each of the logging tables to, e.g., 
+14 days, edit the following properties in this file as follows:
++
+	DWH_TDP_LOG_CHANNEL_TIMEOUT_IN_DAYS=14
+	DWH_TDP_LOG_JOB_TIMEOUT_IN_DAYS=14
+	DWH_TDP_LOG_JOBENTRY_TIMEOUT_IN_DAYS=14
+	DWH_TDP_LOG_TRANS_TIMEOUT_IN_DAYS=14
+	DWH_TDP_LOG_TRANSSTEP_TIMEOUT_IN_DAYS=14
+	DWH_TDP_LOG_TRANSPERFORMANCE_TIMEOUT_IN_DAYS=14
+	DWH_TDP_LOG_TRANSMETRICS_TIMEOUT_IN_DAYS=14
+
+[start=2]
+. Update the master configuration file:
++
+After the configuration parameters in the file `dwh-qfree.properties` are
+modified, it is necessary to synchronize these values with the master 
+configuration file that is used by all PDI applications. This is done by
+executing:
++
+ $ sudo -iu etl
+ $ java -jar /opt/dwh/dwh-etl/pdi_config/dwh_merge_local_properties.jar
++
+or:
++
+ $ sudo -iu etl java -jar /opt/dwh/dwh-etl/pdi_config/dwh_merge_local_properties.jar
++
+IMPORTANT: If you omit this step, all ETL scripts will continue to use the old 
+retention times.
+
+==== Logging text file
+
+Note that in addition to the logging tables in the DWH database described above, 
+there is also a log file named `dwh.log` written in the `$DWH_LOGDIR` directory.
+
+Assuming that you have logged into the "etl" account or have switched to it 
+from another account using `sudo su -l etl`, you can monitor the log file as it
+is being written to via ETL scripts with:
+
+ $ tail -F $DWH_LOGDIR/dwh.log
+
+The default value of `$DWH_LOGDIR` is:
+
+ /opt/dwh/dwh-etl/logging
+
+but you can change this to specify a directory in `/var/log/` or anywhere else.
+
+IMPORTANT: Regardless of where the log file `dwh.log` is written, it will not be 
+automatically truncated or rotated. The file will continue to grow without 
+bound. If you would like to automate the rotation of this log file and to
+automatically delete old log files, use a tool designed for this purpose, such
+as the `logrotate` utility, which is available in most Linux distributions.
+
+
+[id="1.6.0-RN2"]
+=== Zero-length strings not longer treated as NULL
+
+In previous versions of this "dwh-etl" package, ETL jobs replaced zero-length 
+strings from the TDP Archive database with SQL NULLs when writing to the mirror 
+tables in the data warehouse.
+
+This behaviour has been modified so that zero-length strings from the TDP 
+Archive database will be written as zero-length strings in the mirror 
+tables in the data warehouse, i.e., zero-length strings will be preserved.
+
+SQL NULLs from the TDP Archive database are written as SQL NULLs in the mirror 
+tables in the data warehouse; this behaviour has not been modified.

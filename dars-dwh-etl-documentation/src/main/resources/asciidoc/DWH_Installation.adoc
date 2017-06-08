@@ -1,0 +1,454 @@
+= Installation of the TDP data warehouse
+Jeffrey Zelt <jeffrey.zelt@q-free.com>
+
+== Summary
+This document covers all steps related to installing software for managing the 
+TDP data warehouse (DWH). Configuration of this software is covered in another
+document, "Configuration of the TDP data warehouse". The topics covered here 
+include:
+
+* Prerequisites
+* Software installation procedure
+* Configuration
+
+== Prerequisites
+
+=== Linux
+
+This software has been tested on Ubuntu 16.04 LTS, but should be compatible with
+most recent Linux distributions that support the .deb package format, in 
+particular Ubuntu and Debian. A list of certified distributions  for the DWH 
+host will not be provided here. 
+
+== PostgreSQL
+
+This software expects that a PostgreSQL 9.5 environment is present in the host
+OS. Both the *server* and the *client* (psql) packages are required.
+
+If the default PostgreSQL distribution provided by your Linux distribution is 
+not version 9.5, there is a good description of how to obtain the latest
+pre-built binary packages for most flavors of Linux here: 
+
+http://www.postgresql.org/download/
+
+A PostgreSQL role must be created that will own the data warehouse database. The
+suggested name for this role is:
+
+ etl
+
+If such a role does not yet exist, it can be created from a bash shell with:
+
+ $ sudo -iu postgres psql -c "CREATE ROLE etl PASSWORD 'etl' LOGIN INHERIT"
+
+This assumes that this command is run locally on the DWH host, the role password
+shall be "etl" and that "peer"
+authentication is enabled for the superuser "postgres" (this is the default
+authentication method for the "postgres" role after the PostgreSQL server
+package is installed). If a different password is chosen for the "etl" role 
+(highly recommended), it will be needed later when configuring the DWH.
+
+In order for this "etl" role to be allowed to connect to the DWH 
+database, client authentication must be configured appropriately for this
+PostgreSQL cluster. This is done by editing the `pg_hba.conf`configuration file,
+which on Ubuntu is located here:
+
+ /etc/postgresql/9.5/main/pg_hba.conf
+
+In this file, comment out the line:
+
+ local   all             all                                     peer
+
+and then add the following line after it:
+
+ local   all             all                                     md5
+
+Equivalently, one can just change "peer" to "md5" on the original line. After
+this change is made, it is necessary to signal the PostgreSQL server to reload
+its configuration files. For a default PostgreSQL installation on Ubuntu, this
+can be done with:
+
+ $ sudo -iu postgres /usr/lib/postgresql/9.5/bin/pg_ctl -D /var/lib/postgresql/9.5/main reload
+
+Additional configuration is required to enable remote connections to the 
+PostgreSQL cluster. If this is necessary, see:
+
+http://www.postgresql.org/docs/current/static/runtime-config-connection.html 
+
+The role name "etl" and its password will be needed when configuring the ETL
+scripts that update the DWH. This is covered in the document "Configuration of 
+the TDP data warehouse".
+
+
+=== Java SE Runtime Environment 8
+
+A Java SE Runtime Environment 8 must be provided in the host OS. A Java SE 
+Development Kit 8 environment is also acceptable since a JDK environment 
+provides a superset of features when compared to a JRE.
+
+Either Oracle Java 8 or OpenJDK can be provided.
+
+
+== Software installation procedure
+
+The following tasks must be performed to provide a complete
+environment for the TDP data warehouse:
+
+* Installation of the TDP data warehouse database
+* Installation of the Pentaho Data Integration (PDI) platform
+* Installation of the Q-Free ETL (Extract Transform and Load) toolkit for PDI
+
+To provide this software environment, a collection of packages must be 
+installed. These packages will be provided to you by Q-Free. They must be copied 
+onto the DWH host in order to be installed.
+
+Each of the tasks listed above will now be described in detail.
+
+
+=== Installation of the TDP data warehouse database
+
+This task is described in a separate document: "Installation of the TDP data 
+warehouse database".
+
+TIP: The TDP data warehouse database should be installed on the same host as the
+the Pentaho Data Integration platform and Q-Free ETL toolkit for PDI. Although
+this is not required for the ETL software to function, it will greatly speed
+up its performance.
+
+See DWH_DB_InstallationGuide.pdf for detailed instructions for deploying the DWH 
+Databases
+
+=== Installation of the Pentaho Data Integration (PDI) platform
+
+The community edition of 
+http://community.pentaho.com/projects/data-integration/[Pentaho Data Integration]
+can be installed by executing:
+
+ $ sudo dpkg -i pdi-<version>_all.deb
+
+==== Overview of files installed
+
+This package is responsible for installing the following files:
+
+.Files installed by `pdi-<version>_all.deb`
+|===
+|File(s) |Description
+
+|`/usr/share/pentaho/pdi/pdi-<version>/`
+|Directory containing the Q-Free ETL toolkit for PDI. This will included a JDBC
+driver for the PostgreSQL RDBMS.
+
+|`/usr/share/pentaho/pdi/pdi-default`
+|Symbolic link to the current PDI installation. This link will be
+updated when a new version of PDI is installed. This 
+mechanism ensures that the default installation can always be referenced using 
+the same directory path, while at the same time supporting multiple versions of 
+this software. The "default" version will normally be the most recently 
+installed version, but if unforeseen problems are encountered, this link can be 
+updated to point to an earlier release that is known to be stable.
+|===
+
+Here is an example of what the `/usr/share/pentaho/pdi/` directory should like
+after the package is installed (the version numbers could differ from what you 
+see):
+
+ $ cd /usr/share/pentaho/pdi/
+ $ ls -lF
+ total 4
+ drwxr-xr-x 16 root root 4096 Apr 15 06:48 pdi-6.0.1.3-416/
+ lrwxrwxrwx  1 root root   15 Apr 14 17:56 pdi-default -> pdi-6.0.1.3-416/
+ $
+
+=== Installation of the Q-Free ETL toolkit for PDI
+
+Q-Free ETL toolkit for PDI can be installed by executing:
+
+ $ sudo dpkg -i dwh-etl-<version>.deb
+
+This will install files that represent the metadata required to configure and
+run the PDI ETL jobs for loading, updating and maintaining the TDP data 
+warehouse.
+
+==== Overview of files installed
+
+This package is responsible for installing the following files:
+
+.Files installed by `dwh-etl-<version>.deb`
+|===
+|File(s) |Description
+
+|`/opt/dwh/dwh-etl/`
+|Directory containing the Q-Free ETL toolkit for PDI. The content of 
+this directory is is described below in "The /opt/dwh/dwh-etl/ directory".
+
+|`/etc/dwh/dwh-etl/q-free/dwh-qfree.properties`
+|Configuration file for parameters whose values must be chosen by
+Q-Free. This file is created only if this is the first installation of a 
+`dwh-etl-<version>.deb` package. The installation of of subsequent 
+versions will not overwrite this file.
+
+|`/etc/dwh/dwh-etl/config/dwh.properties`
+|Configuration file for parameters whose values can be specified by the customer 
+(end-user). This file is created only if this is the first installation of a 
+`dwh-etl-<version>.deb` package. The installation of of subsequent 
+versions will not overwrite this file.
+
+|`/etc/cron.d/dwh-etl`
+|This file can be customized to schedule one or more ETL jobs using the Linux 
+"cron" scheduler. For details, see the accompanying document, 
+"Configuration of the TDP data warehouse". This file is created only if this is 
+the first installation of a `dwh-etl-<version>.deb` package. The 
+installation of of subsequent versions will not overwrite this file.
+
+|`/home/etl/`
+|If this is the first installation of a `dwh-etl-<version>.deb` package,
+a Linux account will be created for the user "etl". This will create the
+directory `/home/etl/` and populate it with a file named `.profile`. This is
+described in more detail below in "The /home/etl/ directory".
+|===
+
+===== The /opt/dwh/dwh-etl/ directory
+
+This directory contains files required for implementing the ETL functionality
+for maintaining the TDP data warehouse. The files are organized in a directory 
+structure that should look as follows:
+
+ $ cd /opt/dwh/dwh-etl
+ $ ls -lF
+ total 28
+ drwxr-xr-x 4 etl etl 4096 Apr 14 20:21 jdbc_drivers/
+ drwxr-xr-x 2 etl etl 4096 Apr 14 20:25 logging/
+ drwxr-xr-x 4 etl etl 4096 Apr 14 20:21 pdi_config/
+ drwxr-xr-x 5 etl etl 4096 Apr 14 20:25 pdi_repository/
+ drwxr-xr-x 2 etl etl 4096 Apr 14 20:21 scripts/
+ drwxr-xr-x 2 etl etl 4096 Apr 14 20:21 templates/
+ $ 
+
+WARNING: Do not store any files in this directory because they will be deleted 
+when this product is upgraded.
+
+Each of the subdirectories of 
+`/opt/dwh/dwh-etl/` will be briefly 
+described:
+
+====== jdbc_drivers/ directory
+
+This directory contains JDBC drivers that can be used with PDI. You can ignore
+this directory.
+
+====== logging/ directory
+
+By default, all ETL scripts will write logging information to a file named 
+`dwh.log` in this directory.
+
+====== pdi_config/ directory
+
+This directory contains configuration files for PDI. These should not
+be edited directly.
+
+This directory also contains a simple Java application packaged as a JAR file:
+
+ dwh_merge_local_properties.jar
+
+The use of this application is described in an accompanying document, 
+"Configuration of the TDP data warehouse".
+
+====== pdi_repository/ directory
+
+This directory contains metadata that defines jobs, transformations, database
+connections and other details used by PDI when a script is run from the 
+`scripts/` directory.
+
+====== scripts/ directory
+
+This directory contains shell scripts, most of which perform a specific ETL
+task related to the TDP DWH. A script may be executed manually in a shell from
+the command line or scheduled to run automatically according to a schedule.
+
+The following table describes the scripts provided:
+
+[cols="2,3a"]
+.ETL scripts
+|===
+|Script |Description
+
+|dwh_tdp_kitchen.sh
+|This is a helper script that is used by the other scripts. It is not meant to
+be called directly.
+
+|dwh_tdp_mirrored_tables-update.sh
+|This script updates all tables in the data warehouse that mirror  
+tables in the TDP archive database. This synchronizes the mirrored
+tables with their counterparts in the TDP archive database.
+
+The tables from the TDP archive database that are mirrored in
+the data warehouse are listed below in the table 
+"*Mirrored tables in the data warehouse*".
+
+//|dwh_tdp_data_mart-update.sh
+//|This script updates all tables in the "dma" schema of the data warehouse that 
+//comprise the star-schema TDP data mart. This update is based on data that has 
+//been loaded into the tables in the data warehouse that mirror their counterparts 
+//in the TDP archive database; hence, these mirrored tables should always be
+//updated before the tables in the TDP data mart are updated.
+//
+//The tables in the "dma" schema of the data warehouse that 
+//comprise the star-schema TDP data mart are listed below in the table 
+//"*TDP data mart tables in the data warehouse*".
+
+|dwh_tdp_update.sh
+|This script will, over time, be extended to perform actions that are
+appropriate for updating the entire TDP data warehouse. Currently, this script 
+performs the same action as if the following scripts were executed, in the order
+that they are listed here:
+
+. `dwh_tdp_mirrored_tables-update.sh`
+//. `dwh_tdp_data_mart-update.sh`
+
+In the future, the behaviour of this script may change if additional content is
+stored in the data warehouse.
+|===
+
+
+[width=50]
+.Mirrored tables in the data warehouse
+|===
+|Schema         |Table
+
+1.8+|eip        |audittrail
+                |audittrail_type
+                |group_result
+                |image_result
+                |image_result_bag
+                |passage_result
+                |passage_result_bag
+                |passage_result_type
+1.2+|fs_dds     |delete_reason_type
+                |request
+1.5+|fs_file    |deleted
+                |file_status
+                |file_type
+                |storage_type
+                |tdp_file
+1.2+|fs_reserved|reserved_history
+                |reserved_reason_type
+1.3+|obu        |obu_issuer 
+                |obu_manufacturer
+                |obu_type
+1.29+|passage   |completion_category
+                |completion_sub_category
+                |flag
+                |flag_type
+                |image
+                |image_alpr_result
+                |image_alpr_result_bag
+                |image_bag
+                |image_orientation
+                |image_signature
+                |image_type
+                |obu
+                |obu_data
+                |obu_data_bag
+                |passage
+                |passage_alpr_result
+                |passage_alpr_result_bag
+                |passage_bag
+                |passage_group
+                |passage_group_history
+                |passage_group_status
+                |passage_group_type
+                |passage_status
+                |passage_type
+                |region_of_interest
+                |reserved
+                |reserved_history
+                |signature_source
+                |signature_type
+1.2+|re_ident   |batch
+                |batch_status
+                |request
+                |request_type
+1.22+|tolldomain|billable_jurisdiction
+                |camera
+                |camera_orientation
+                |camera_type
+                |charging_point
+                |charging_point_group
+                |charging_point_group_group
+                |charging_point_group_type
+                |charging_point_status
+                |charging_point_type
+                |country
+                |cp_service_provider
+                |jurisdiction
+                |lane
+                |lane_camera
+                |lane_direction
+                |lane_status
+                |lane_type
+                |service_provider
+                |service_provider_status
+                |service_provider_type
+                |vehicle_class
+1.5+|workflow   |asyncqueue
+                |asyncqueue_log
+                |asyncservice
+                |passage_workflow
+                |workflow_step
+|===
+
+////
+[width=60]
+.TDP data mart tables in the data warehouse
+|===
+|Schema         |Table
+
+1.6+|dma        |bridge_chargingpointlane_chargingpointgroup
+                |dim_charging_point_group
+                |dim_charging_point_lane
+                |dim_date
+                |dim_time
+                |fact_passage
+|===
+////
+
+
+For a description of how to run an ETL script manually from the command line and
+how to configure it to run automatically according to a schedule, see the 
+accompanying document, "Configuration of the TDP data warehouse".
+
+It is recommended that these ETL scripts be run as follows:
+
+. For a new installation, run script `dwh_tdp_mirrored_tables-update.sh` 
+manually to load the mirrored tables in the data warehouse. If any error occurs,
+truncate these tables, fix the error and then repeat until the script runs 
+cleanly. 
+//. For a new installation, run script `dwh_tdp_data_mart-update.sh` manually to 
+//load the tables of the TDP data mart in the data warehouse. If any error 
+//occurs, truncate these tables, fix the error and then repeat until the script 
+//runs cleanly.
+
+. Schedule script `dwh_tdp_update.sh` to run according
+to a schedule that reflects how up to date you need the data to be in the data
+warehouse.
+
+====== templates/ directory
+
+This directory contains files that are installed the first time that a
+`dwh-etl-<version>.deb` package is installed. The contents of this 
+directory can be ignored. Nevertheless, it can be useful to view these files 
+after new version of this package is installed to discover additional settings 
+supported by the new version.
+
+===== The /home/etl/ directory
+
+This is the home directory for the "etl" account. It will contain a file named
+`.profile` that is used to define important environment variables for this
+account. For more details, see the accompanying document, 
+"Configuration of the TDP data warehouse".
+
+== Configuration
+ 
+After all software has been successfully installed, the DWH must be configured.
+This configuration is required so that the Q-Free ETL toolkit can
+load and maintain the TDP DWH database. This configuration is covered in an 
+accompanying document, "Configuration of the TDP data warehouse".

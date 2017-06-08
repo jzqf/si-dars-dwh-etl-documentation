@@ -1,0 +1,60 @@
+= Upgrading the Q-Free ETL toolkit for the TDP data warehouse
+Jeffrey Zelt <jeffrey.zelt@q-free.com>
+
+== Summary
+This document covers the steps required for upgrading an existing installation
+of the Q-Free ETL (Extract Transform and Load) toolkit for Pentaho Data 
+Integration (PDI), which maintains the TDP data warehouse (DWH). The topics 
+covered here include:
+
+* Prerequisites
+* Software upgrade procedure
+* Configuration of the upgraded software
+* Updating the master configuration file
+
+== Prerequisites
+
+It is assumed that:
+
+. The _previous_ version of the "dwh-etl" Debian package for the the Q-Free 
+ETL toolkit for PDI is currently installed.
+. The TDP data warehouse database has been upgraded to the current version, if 
+necessary.
+
+== Software upgrade procedure
+
+You will be provided with a Debian package for the new version of the Q-Free ETL 
+toolkit for PDI, `dwh-etl-<version>.deb`. Installing this package will 
+upgrade the software. Execute the following:
+
+ $ sudo dpkg -i dwh-etl-<version>.deb
+
+== Configuration of the new version of the Q-Free ETL toolkit for PDI
+
+You will be provided with release notes for the new version of the Q-Free ETL 
+toolkit for PDI. Follow the instructions in that document before proceeding 
+here.
+
+== Updating the master configuration file
+
+Regardless of whether or not it is necessary to configure the upgrade after
+installing the new `dwh-etl` package, it is essential to synchronize the 
+master configuration file that is distributed with the package with the settings
+stored in your local configuration files:
+
+ /etc/dwh/dwh-etl/q-free/dwh-qfree.properties
+ /etc/dwh/dwh-etl/config/dwh.properties
+
+This is done by executing from a shell the following:
+
+ $ sudo -iu etl
+ $ java -jar /opt/dwh/dwh-etl/pdi_config/dwh_merge_local_properties.jar
+
+or:
+
+ $ sudo -iu etl java -jar /opt/dwh/dwh-etl/pdi_config/dwh_merge_local_properties.jar
+
+IMPORTANT: If you neglect to run `dwh_merge_local_properties.jar` as shown here, 
+all ETL scripts will use the *default* configuration parameter values associated 
+with a new installation of the `dwh-etl` package, which will not be
+appropriate for your installation.

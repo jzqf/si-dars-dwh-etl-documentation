@@ -1,0 +1,335 @@
+= TDP data warehouse developer documentation
+Jeffrey Zelt <jeffrey.zelt@q-free.com>
+
+== Summary
+This document describes details that are of interest to Q-Free developers that 
+work with the TDP data warehouse. Topics that relate to installation and 
+configuration of this software at a customer site are described elsewhere in the
+documents entitled:
+
+* Installation of the TDP data warehouse
+* Configuration of the TDP data warehouse
+
+The topics covered in this document include:
+
+. <<Section-MirroringTables>>
+. <<Section-LastSuccessfulLoad>>
+
+[id="Section-MirroringTables"]
+== Mirroring tables from the TDP Archive database
+
+Tables are mirrored from the TDP Archive database to the data warehouse. This 
+provides the customer with the ability to query archived operational data 
+without loading the database server that hosts the TDP operational database(s).
+Configuration details must be specified for each table that shall be mirrored.
+These details are described below.
+
+It is possible for a developer to run a special verification script to compare
+the data stored in the data warehouse with the original data in the TDP Archive
+database tables. This procedure is described below.
+
+Both the configuration details as well as the verification statistics are stored
+in a table named `table_config` in the `etl` schema of the data warehouse. The 
+columns of this table are also documented below. Some of these columns must be 
+assigned values to perform the necessary configuration and other columns are
+set automatically by the verification procedure in order to provide detailed
+verification statistics for each table.
+
+=== Configuration
+
+The `table_config` table located in the `etl` schema of the data warehouse
+is used to configure which tables from the TDP Archive database will be
+mirrored to the data warehouse. This configuration also specifies which
+algorithm the data warehouse shall use to perform this mirroring. A generic
+algorithm is available that can be used to mirror any table, regardless of the
+table's structure, as long as rows are only inserted into the table (not updated
+or deleted). A custom algorithm can also be specified on a table by table basis,
+but the custom algorithm must be implemented first in the ETL scripts that 
+perform the custom mirroring functionality.
+
+The following table describes the columns of `etl.table_config` that are used to
+configure table mirroring. Tables from the TDP Archive database that are not
+specified in `etl.table_config` are *not* mirrored.
+
+[cols="1,1,1,3a"]
+.Columns of `etl.table_config` used to configure table mirroring
+|===
+|Column|Type|Attributes|Description
+
+|`table_config_id` | `smallint` | `not null`
+|Primary key. A value must be specified; it is *not* an auto-increment column.
+
+|`source_db_id` | `smallint` | `not null`
+|Identifier for database in which the source table to be mirrored is located.
+Specify "*1*" for the TDP Archive DB. This is the only value currently supported.
+
+|`schema_name` | `varchar(80)` | `not null`
+|Name of the schema in the source database containing the table to be mirrored.
+A schema with the same name must exist in the data warehouse. 
+
+|`table_name` | `varchar(80)` | `not null`
+|Name of the table in the source database that will be mirrored in the data
+warehouse. A table with the same name must exist in the data warehouse with a
+"compatible" structure. The table in the data warehouse must be in a schema with 
+the same name as the source table in the source database.
+
+A "compatible" structure means that the table in the data warehouse has columns
+of the same name and the same data type as the source table in the source database.
+In *_addition_*, the table in the data warehouse must have an extra column that
+is named "*etl_batch_id*" of data type "integer" or "bigint".
+
+|`can_insert_rows` | `boolean` | `not null`
+|Set this to "*true*" if the table in the source database can have rows inserted
+into it. Such a table can grow over time.
+
+|`can_update_rows` | `boolean` | `not null`
+|Set this to "*true*" if rows of the source table can be modified after they are
+inserted. Currently, mirroring is not supported for tables where this value is
+"true".
+
+|`can_delete_rows` | `boolean` | `not null`
+|Set this to "*true*" if rows of the source table can be deleted after they are
+inserted. Currently, mirroring is not supported for tables where this value is
+"true".
+
+|`use_custom_mirror_algorithm` | `boolean` | `not null`
+|Set this to "*false*" to use the generic mirroring algorithm supported in the
+ETL scripts for mirroring the table. This algorithm currently supports any table
+as long rows are only inserted in the source database (not updated or deleted). 
+Set this to "*true*" to use a custom algorithm for mirroring the table. However,
+the custom algorithm must be implemented in the ETL scripts. Therefore, do not
+specify "*true*" unless you know that a custom algorithm has been implemented
+for the table.
+
+|`mirror` | `boolean` | `not null`
+|Set this to "*true*" to enable mirroring for the table. If this is set to 
+"*false*", mirroring will be disabled for the table; however, it this is later
+set to "*true*", then mirroring will be resumed from the point where it was
+suspended.
+
+|`mirror_last_updated_treatment_id` | `smallint` | 
+|Specifies which algorithm was last used to mirror rows from the source database
+to the data warehouse. Possible values are:
+
+[horizontal]
+1:: Generic algorithm for mirroring insert-only tables
+2:: Custom algorithm for mirroring insert-only tables
+3:: Custom algorithm for mirroring tables that support inserts or updates (not 
+    currently implemented)
+
+_Do not set a value for this column. It is managed automatically by the ETL
+script that performs the mirroring._
+
+|`mirror_last_updated_on` | `timestamp without time zone` | 
+|The current date and time that the mirror table in the data warehouse was last 
+successfully updated from the source table. The local date and time of the
+PostgreSQL server that hosts the database of the data warehouse is used.
+
+_Do not set a value for this column. It is managed automatically by the ETL
+script that performs the mirroring._
+|===
+
+Here is an example of typical values that can be assigned to these columns:
+
+....
+SELECT
+    table_config_id AS "id", 
+    source_db_id AS "source", 
+    schema_name, 
+    table_name, 
+    can_insert_rows AS "insert", 
+    can_update_rows AS "update", 
+    can_delete_rows AS "delete", 
+    use_custom_mirror_algorithm AS "custom", 
+    mirror
+FROM
+    etl.table_config
+ORDER BY
+    schema_name, 
+    table_name;
+ 
+id | source | schema_name |       table_name        | insert | update | delete | custom | mirror 
+---+--------+-------------+-------------------------+--------+--------+--------+--------+-------
+27 |      1 | ctrl_arc    | history_source          | t      | f      | f      | f      | t
+28 |      1 | ctrl_arc    | history_status          | t      | f      | f      | f      | t
+29 |      1 | ctrl_arc    | history_type            | t      | f      | f      | f      | t
+ 1 |      1 | eip         | audittrail              | t      | f      | f      | f      | t
+30 |      1 | eip         | audittrail_type         | t      | f      | f      | f      | t
+
+    <snip>
+
+24 |      1 | tolldomain  | vehicle_class           | t      | f      | f      | f      | t
+25 |      1 | workflow    | asyncqueue              | t      | f      | f      | f      | t
+60 |      1 | workflow    | asyncservice            | t      | f      | f      | f      | t
+26 |      1 | workflow    | passage_workflow        | t      | f      | f      | f      | t
+61 |      1 | workflow    | workflow_step           | t      | f      | f      | f      | t
+....
+
+
+=== Verification
+
+An ETL script can be run to verify that the tables in the TDP Archive
+database have been correctly mirrored to the data warehouse.
+
+To run this script, execute the following commands from a bash shell on the
+data warehouse host:
+
+....
+$ sudo su -l etl
+$ /usr/share/pentaho/pdi/pdi-default/kitchen.sh \
+  -file="$DWH_HOME/pdi_repository/dwh_tdp/mirror/compare_tables/jb_dwh_tdp_mirrored_tables-compare.kjb" \
+  -rep=DWH -logfile=$DWH_LOGDIR/dwh.log -level=Basic
+....
+
+Here, `kitchen.sh` is a script distributed with a default installation of PDI.
+If PDI is installed in another directory, specify the appropriate path to this
+script.
+
+It is important to run the ETL script as the Linux user `etl` as shown above.
+This will ensure that the necessary environment variables are define. Typical
+values for the two environment variables used here are:
+
+[horizontal]
+$DWH_HOME:: /opt/dwh/dwh-etl
+$DWH_LOGDIR:: /opt/dwh/dwh-etl/logging
+
+As this ETL script runs, it updates rows in the table `etl.table_config` to
+record verification statistics for each mirrored table in the data warehouse. 
+The following table describes the columns of `etl.table_config` that are used to 
+report these verification statistics. All of these columns are set by the ETL 
+script referred to above. They are not meant to be set manually.
+
+[cols="1,1,3"]
+.Columns of `etl.table_config` used for mirror verification statistics
+|===
+|Column|Type|Description
+
+|`last_compared_on` | `timestamp without time zone`
+|Date and time that verification statistics for the table were last computed. 
+The local date and time of the PostgreSQL server that hosts the database of the 
+data warehouse is used.
+
+|`compared_rows_equal` | `integer`
+|The number of rows in the data warehouse mirror table that are identical to
+rows in the source table.
+
+|`compared_rows_unequal` | `integer`
+|The number of rows in the data warehouse mirror table that correspond to rows
+in the source table, but are not identical. This "correspondence" is based on
+comparing primary keys. No information is recorded to report *_which_* columns
+contain values that do not agree. This value should be zero if the table has 
+been mirrored correctly.
+
+|`compared_rows_missing` | `integer`
+|The number of rows in the source table that *_should_* have been mirrored to 
+the data warehouse but are not present in the data warehouse mirror table. This 
+value should be zero if the table has been mirrored correctly.
+
+|`compared_rows_extra` | `integer`
+|The number of rows in the data warehouse mirror table that do not have a
+corresponding row in the source table. This "correspondence" is based on
+comparing primary keys. This value should be zero if the table has been mirrored 
+correctly.
+|===
+
+Here is an example of typical values that can be reported in these columns:
+
+....
+SELECT
+    schema_name, 
+    table_name, 
+    last_compared_on, 
+    compared_rows_equal AS "equal", 
+    compared_rows_unequal AS "unequal", 
+    compared_rows_missing AS "missing", 
+    compared_rows_extra AS "extra"
+FROM
+    etl.table_config
+ORDER BY
+    schema_name, 
+    table_name;
+ 
+ schema_name |   table_name     |      last_compared_on      | equal | unequal | missing | extra 
+-------------+------------------+----------------------------+-------+---------+---------+-------
+ ctrl_arc    | history_source   | 2016-08-26 12:52:59.884033 |    20 |       0 |       0 |     0
+ ctrl_arc    | history_status   | 2016-08-26 12:53:02.087684 |     0 |       0 |       0 |     0
+ ctrl_arc    | history_type     | 2016-08-26 12:53:04.092673 |     2 |       0 |       0 |     0
+ eip         | audittrail       | 2016-08-26 12:53:06.054112 |     0 |       0 |       0 |     0
+ eip         | audittrail_type  | 2016-08-26 12:53:08.010337 |    10 |       0 |       0 |     0
+
+    <snip>
+
+ tolldomain  | vehicle_class    | 2016-08-26 12:54:37.80163  |     1 |       0 |       0 |     0
+ workflow    | asyncqueue       | 2016-08-26 12:54:40.2839   | 17386 |       0 |       0 |     0
+ workflow    | asyncservice     | 2016-08-26 12:54:41.752094 |     4 |       0 |       0 |     0
+ workflow    | passage_workflow | 2016-08-26 12:54:46.648196 | 94689 |       0 |       0 |     0
+ workflow    | workflow_step    | 2016-08-26 12:54:48.402262 |    47 |       0 |       0 |     0
+....
+
+It is important to understand that certain rows from the source and mirrored 
+tables are *_not_* compared to generate these statistics. Not all rows from each 
+table are compared because under normal operation there can be rows in the source
+database table that should not appear in the data warehouse mirror table and, 
+conversely, there can be rows of the data warehouse table that do not 
+necessarily appear in the source database table. These are rows that fall into 
+one of two groups:
+
+. Rows that were inserted into the data warehouse mirror table *earlier* 
+than oldest row inserted into the source table. These are rows that have been
+mirrored from the source table but have, in the meantime, been removed from the
+source table (because of data retention rules or another unknown reason).
+
+. Rows that were inserted into the source table *after* the table was last 
+mirrored to the data warehouse. These are rows in the source table that are 
+waiting to be mirrored and will be mirrored the next time the ETL script is run
+to update the mirrored tables.
+
+If these rows are not excluded from the verification statistics, it can
+appear that the table has not been mirrored correctly because the value assigned
+to column `compared_rows_missing` and/or `compared_rows_extra` could be 
+non-zero. In this situation, careful investigation would conclude that the 
+mirror process was correct and the non-zero statistics reported correspond to
+rows that have not yet been mirrored or rows that have been removed from the 
+source database and, therefore, cannot be compared to the mirror table in the
+data warehouse. To avoid difficulty in interpreting these statistics, the rows 
+are exclude from the statistics. In this way, if non-zero values are reported in
+columns `compared_rows_missing` and/or `compared_rows_extra`, this can be 
+confidently interpreted as a problem situation that should be investigated 
+further.
+
+
+[id="Section-LastSuccessfulLoad"]
+== Timestamp of last successful mirror operation
+
+Tables are mirrored from the TDP Archive database to the data warehouse by an
+ETL script that can be scheduled to run periodically or run on demand. The most
+recent data that has been inserted in the data warehouse should be consistent
+with a snapshot of the TDP Archive database at the time that the ETL script
+was last started, provided that it executes successfully, i.e., with no errors.
+
+One detail that both end-users and developers might be interested in 
+is: "_When was the data warehouse last successfully loaded?_". Reports that are
+generated from the data warehouse will not contain data from after this point in
+time. This timestamp is stored in the `cdc_timestamps` table in the `etl` schema
+of the data warehouse. It can be obtained with the following query. An example
+response is provided as well:
+
+....
+SELECT
+    last_successful_load
+FROM
+    etl.cdc_timestamps 
+WHERE
+    cdc_timestamps_id=1;
+    
+  last_successful_load   
+-------------------------
+ 2016-08-15 15:36:07.671
+....
+
+If no error occurs during the execution of the ETL script, then it can be
+assumed that *all* mirrored tables in the data warehouse have been updated
+successfully. If an error does occur, then some tables in the data warehouse
+may have been updated while others have not been. However, if an error does
+occur, `last_successful_load` is not updated, so it is still a valid timestamp 
+for when the data warehouse was last successfully loaded.

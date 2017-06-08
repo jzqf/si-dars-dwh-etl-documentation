@@ -1,0 +1,325 @@
+== Release notes for package mdx-dwh-etl-1.6.0.deb
+
+. <<1.6.0-RN1>>
+. <<1.6.0-RN2>>
+. <<1.6.0-RN3>>
+. <<1.6.0-RN4>>
+. <<1.6.0-RN5>>
+. <<1.6.0-RN6>>
+. <<1.6.0-RN7>>
+. <<1.6.0-RN8>>
+. <<1.6.0-RN9>>
+. <<1.6.0-RN10>>
+. <<1.6.0-RN11>>
+
+
+== Release notes for package mdx-dwh-etl-1.6.0.deb
+
+[id="1.6.0-RN1"]
+=== Script `dwh_tdp_data_mart-update.sh` added
+
+The script `*dwh_tdp_data_mart-update.sh*` was introduced. Its purpose is to
+update the TDP data mart in the data warehouse, as described in the installation
+document, "Installation of the TDP data warehouse", as well as in other release
+notes in the current document.
+
+
+[id="1.6.0-RN2"]
+=== Script `dwh_tdp_update.sh` updated
+
+The existing script `*dwh_tdp_update.sh*` was updated so that it now performs 
+the same action as if the following scripts were executed, in the order
+that they are listed here:
+
+. `dwh_tdp_mirrored_tables-update.sh`
+. `dwh_tdp_data_mart-update.sh`
+
+This change is consistent with the intended behaviour of this script that it 
+should perform all actions that are appropriate for updating the entire TDP data 
+warehouse.
+
+
+[id="1.6.0-RN3"]
+=== Script `dwh_tdp_mirrored_dynamic_tables_update.sh` removed
+
+The script `*dwh_tdp_mirrored_dynamic_tables_update.sh*`, which was deprecated 
+in v1.4.0, has been removed from the mdx-dwh-etl package.
+
+If it is still in use, it must be replaced with the script:
+
+ /opt/dwh/mdx-dwh-etl/scripts/dwh_tdp_mirrored_tables-update.sh
+
+
+[id="1.6.0-RN4"]
+=== Script `dwh_tdp_mirrored_static_tables_truncate_reload.sh` removed
+
+The script `*dwh_tdp_mirrored_static_tables_truncate_reload.sh*`, which was deprecated 
+in v1.4.0, has been removed from the mdx-dwh-etl package.
+
+If it is still in use, it must be replaced with the script:
+
+ /opt/dwh/mdx-dwh-etl/scripts/dwh_tdp_mirrored_tables-update.sh
+
+
+[id="1.6.0-RN5"]
+=== "DWH_TDP_DWH" database connection parameters renamed
+
+The configuration parameters:
+
+	DWH_TDP_DWH_DB_HOST
+	DWH_TDP_DWH_DB_DATABASE
+	DWH_TDP_DWH_DB_PORT
+	DWH_TDP_DWH_DB_USERNAME
+	DWH_TDP_DWH_DB_PASSWORD
+	
+have been renamed to, respectively:
+ 
+	DWH_TDP_MIRROR_DB_HOST
+	DWH_TDP_MIRROR_DB_DATABASE
+	DWH_TDP_MIRROR_DB_PORT
+	DWH_TDP_MIRROR_DB_USERNAME
+	DWH_TDP_MIRROR_DB_PASSWORD
+
+These variables should be renamed in the file:
+	
+	/etc/dwh/mdx-dwh-etl/q-free/dwh-qfree.properties
+
+In addition, the following configuration parameter has been eliminated and can 
+be _removed_ from `dwh-qfree.properties`:
+
+	DWH_TDP_DWH_DB_SCHEMA
+	
+These changes will not be performed automatically for you. You will need to 
+modify your copy of `dwh-qfree.properties` using a text editor to make these 
+changes. To view a copy of `dwh-qfree.properties` that already contains these 
+changes, see the template file (used for new installations, not for upgrades):
+
+	/opt/dwh/mdx-dwh-etl/templates/dwh-qfree.properties
+	
+After modifying `/etc/dwh/mdx-dwh-etl/q-free/dwh-qfree.properties`, you will 
+need to synchronize it with the master configuration file. This can be done from 
+a shell as follows:
+
+ $ java -jar /opt/dwh/mdx-dwh-etl/pdi_config/dwh_merge_local_properties.jar
+
+
+[id="1.6.0-RN6"]
+=== Mail configuration property updated
+
+The default value for the configuration parameter:
+
+	DWH_QF_MAIL_MSG_BODY_FAILURE
+
+has been updated in
+
+	/opt/dwh/mdx-dwh-etl/templates/dwh-qfree.properties
+
+The new default value is:
+
+	DWH_QF_MAIL_MSG_BODY_FAILURE=The job "${PARAM_JOB_NAME}" failed.${line.separator}Job ID = ${PARAM_JOB_BATCH_ID}${line.separator}${line.separator}${DWH_QF_MAIL_BODY_FAILURE_ADDITIONAL_INFO}
+
+Compare this new default value with the current value that is assigned to this 
+parameter in the file:
+
+	/etc/dwh/mdx-dwh-etl/q-free/dwh-qfree.properties ,
+
+and update it manually, if necessary. If you do modify this file, you will 
+need to synchronize it with the master configuration file. This can be done from 
+a shell as follows:
+
+ $ java -jar /opt/dwh/mdx-dwh-etl/pdi_config/dwh_merge_local_properties.jar
+
+If you have already customized this value yourself and are satisfied with this
+value, you can keep the value that you have set. The new value is only a 
+sensible default.
+
+
+[id="1.6.0-RN7"]
+=== Java SE Runtime Environment 8 required
+
+Although the document "Installation of the TDP data warehouse" has specified 
+that JRE 8 has been required for recent releases, it was possible to run the ETL
+software for managing the TDP data warehouse under a JRE 7 environment. As of 
+this release, runtime errors should be expected if a JRE environment earlier 
+than version 8 is used.
+
+
+[id="1.6.0-RN8"]
+=== 36 additional tables mirrored from the TDP Archive database
+
+The following 36 tables have been added to the data warehouse. These tables are 
+mirrored from the TDP Archive database.
+
+[width=50]
+.New tables in the data warehouse, mirrored from the TDP Archive database.
+|===
+|Schema  |Table
+
+1.3+|ctrl_arc   |history_source
+                |history_status
+                |history_type
+1.1+|eip        |audittrail_type
+1.1+|fs_dds     |delete_reason_type
+1.3+|fs_file    |file_status
+                |file_type
+                |storage_type
+1.1+|fs_reserved|reserved_reason_type
+1.2+|list       |status_list_status
+                |status_list_type
+1.3+|obu        |obu_issuer 
+                |obu_manufacturer
+                |obu_type
+1.7+|passage    |completion_category
+                |completion_sub_category
+                |flag_type
+                |image_signature_source
+                |image_signature_type
+                |passage_group_status
+                |pgroup_type
+1.1+|pcs_mlff   |file_status
+1.2+|re_ident   |batch_status
+                |request_type
+1.1+|security   |event_type
+1.9+|tolldomain |camera_orientation
+                |camera_type
+                |cp_lane_direction
+                |cp_lane_status
+                |cp_lane_type
+                |cp_status
+                |cp_type
+                |service_provider_status
+                |service_provider_type
+1.2+|workflow   |asyncservice
+                |workflow_step
+|===
+
+[id="1.6.0-RN9"]
+=== TDP star schema data mart introduced
+
+A data mart has been introduced for analyzing information stored in the the TDP 
+archive database.
+
+IMPORTANT: This is a work in progress - the data model will evolve over time. 
+Do not expect that queries written for the data model of the current data mart 
+to necessarily function correctly in the future. A future release note
+will announce when the data model is stable.
+
+The data mart is based on a star schema, using standard dimensional modeling
+concepts. Only a small subset of the data in the TDP archive process is 
+currently loaded into this data mart. The database currently consists of the 
+following tables:
+
+[width=65]
+.Tables in the TDP data mart.
+|===
+|Schema  |Table
+
+1.6+|dma        |bridge_chargingpointlane_chargingpointgroup
+                |dim_charging_point_group
+                |dim_charging_point_lane
+                |dim_date
+                |dim_time
+                |fact_passage
+|===
+
+==== Data mart configuration parameters.
+
+There are several configuration parameters that can be used to customize the TDP
+data mart, as listed in the following table.
+
+.Configuration parameters for TDP star schema data mart.
+|===
+|Name |Example value |Description
+
+|*DWH_TDP_DMA_DIM_DATE_YEAR_MIN* |2016 |The date dimension will start on January 1 of this year.
+|*DWH_TDP_DMA_DIM_DATE_YEAR_MAX* |2025 |The date dimension will end on December 31 of this year.
+
+|[small]#*DWH_TDP_DMA_DIM_TIME_RESOLUTION_SECONDS*# |1 |The resolution in seconds of the 
+time dimension. This must either divide exactly into the the number of seconds 
+in a minute (60) or be a multiple of 60, and at the same time it must either 
+divide exactly into the the number of seconds in an hour (3600) or be a multiple 
+of 3600.
+
+|*DWH_TDP_DMA_LOCALE_LANGUAGE_CODE* |en |The two-letter
+http://www.loc.gov/standards/iso639-2/php/code_list.php[ISO 639-1] language code 
+to use with the data mart. This is used together with the country code to 
+specify a locale that is used to generate locale-specific strings, e.g., days 
+names, month names, etc. Examples are: "*nb*" (Norwegian Bokmål), "*en*" 
+(English), etc.
+
+|*DWH_TDP_DMA_LOCALE_COUNTRY_CODE* |us |The two-letter 
+https://www.iso.org/obp/ui/[ISO 3166-1] country code to use
+with the data mart. This is used together with the language code to specify a
+locale that is used to generate locale-specific strings, e.g., days names, month
+names, etc. Examples are: "*no*" (Norway), "*us*" (United States of America), 
+etc.
+|===
+
+For more details regarding the tables and configuration parameters related to
+the data mart, see the documents "Installation of the TDP data warehouse" and 
+"Configuration of the TDP data warehouse".
+
+
+[id="1.6.0-RN10"]
+=== TDP data mart database connection parameters added
+
+Configuration parameters for the TDP star-schema data mart database have been
+introduced. These are:
+
+	DWH_TDP_DMA_DB_HOST
+	DWH_TDP_DMA_DB_DATABASE
+	DWH_TDP_DMA_DB_PORT
+	DWH_TDP_DMA_DB_USERNAME
+	DWH_TDP_DMA_DB_PASSWORD
+	DWH_TDP_DMA_DB_SCHEMA
+
+These variables should be added to the file:
+	
+	/etc/dwh/mdx-dwh-etl/q-free/dwh-qfree.properties
+	
+These changes will not be performed automatically for you. You will need to 
+modify your copy of `dwh-qfree.properties` using a text editor to add these 
+parameters. The default values for these parameters are:
+
+	DWH_TDP_DMA_DB_HOST=localhost
+	DWH_TDP_DMA_DB_DATABASE=dwh_tdp_db
+	DWH_TDP_DMA_DB_PORT=5432
+	DWH_TDP_DMA_DB_USERNAME=etl
+	DWH_TDP_DMA_DB_PASSWORD=etl
+	DWH_TDP_DMA_DB_SCHEMA=dma
+
+If you do not add entries for these parameters in 
+`/etc/dwh/mdx-dwh-etl/q-free/dwh-qfree.properties`, then the default values will 
+be used.
+	
+After modifying `/etc/dwh/mdx-dwh-etl/q-free/dwh-qfree.properties`, you will 
+need to synchronize it with the master configuration file. This can be done from 
+a shell as follows:
+
+ $ java -jar /opt/dwh/mdx-dwh-etl/pdi_config/dwh_merge_local_properties.jar
+
+
+[id="1.6.0-RN11"]
+=== Data mart date dimension parameters renamed
+
+The configuration parameters:
+
+	DWH_TDP_DMA_DIM_TIME_YEAR_MIN
+	DWH_TDP_DMA_DIM_TIME_YEAR_MAX
+
+have been renamed, respectively, to:
+
+	DWH_TDP_DMA_DIM_DATE_YEAR_MIN
+	DWH_TDP_DMA_DIM_DATE_YEAR_MAX
+
+You will need to make this change in your local configuration file:
+
+	/etc/dwh/mdx-dwh-etl/q-free/dwh-qfree.properties .
+
+After this change is made, you need to synchronize this file with the master 
+configuration file. This can be done from a shell as follows:
+
+ $ java -jar /opt/dwh/mdx-dwh-etl/pdi_config/dwh_merge_local_properties.jar
+
+Although initial data mart functionality was just added in the v1.6.0 release, 
+these configuration parameters were already present in previous releases.

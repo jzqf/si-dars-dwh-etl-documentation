@@ -1,0 +1,153 @@
+== Release notes for package mdx-dwh-etl-1.4.0.deb
+
+. <<1.4.0-RN1>>
+. <<1.4.0-RN2>>
+. <<1.4.0-RN3>>
+. <<1.4.0-RN4>>
+. <<1.4.0-RN5>>
+
+
+== Release notes for package mdx-dwh-etl-1.4.0.deb
+
+[id="1.4.0-RN1"]
+=== Script `dwh_tdp_mirrored_dynamic_tables_update.sh` deprecated
+
+The script `*dwh_tdp_mirrored_dynamic_tables_update.sh*` has been 
+deprecated and will be removed in a future release of the mdx-dwh-etl package.
+
+If this script is in use, such as being scheduled for periodic execution via 
+https://en.wikipedia.org/wiki/Cron[cron], it can be 
+replaced with the script `*dwh_tdp_mirrored_tables-update.sh*`. Both of these
+scripts are located in the directory
+
+ /opt/dwh/mdx-dwh-etl/scripts
+
+For an example of a configuration line that can be placed in the file:
+
+ /etc/cron.d/mdx-dwh-etl
+
+which will schedule the new script, `*dwh_tdp_mirrored_tables-update.sh*`, see:
+	
+ /opt/dwh/mdx-dwh-etl/templates/mdx-dwh-etl.cron
+
+The old script, `*dwh_tdp_mirrored_dynamic_tables_update.sh*`, has been updated
+so that it now performs the function of *_both_* of the previous scripts:
+
+ /opt/dwh/mdx-dwh-etl/scripts/dwh_tdp_mirrored_dynamic_tables_update.sh
+ /opt/dwh/mdx-dwh-etl/scripts/dwh_tdp_mirrored_static_tables_truncate_reload.sh
+
+
+[id="1.4.0-RN2"]
+=== Script `dwh_tdp_mirrored_static_tables_truncate_reload.sh` deprecated
+
+The script `*dwh_tdp_mirrored_static_tables_truncate_reload.sh*` has been 
+deprecated and will be removed in a future release of the mdx-dwh-etl package.
+
+If this script is in use, such as being scheduled for periodic execution via 
+https://en.wikipedia.org/wiki/Cron[cron], it can be 
+replaced with the script `*dwh_tdp_mirrored_tables-update.sh*`. Both of these
+scripts are located in the directory
+
+ /opt/dwh/mdx-dwh-etl/scripts
+
+For an example of a configuration line that can be placed in the file:
+
+ /etc/cron.d/mdx-dwh-etl
+
+which will schedule the new script, `*dwh_tdp_mirrored_tables-update.sh*`, see:
+	
+ /opt/dwh/mdx-dwh-etl/templates/mdx-dwh-etl.cron
+
+The old script, `*dwh_tdp_mirrored_static_tables_truncate_reload.sh*`, has been 
+updated so that it now performs the function of *_both_* of the previous 
+scripts:
+
+ /opt/dwh/mdx-dwh-etl/scripts/dwh_tdp_mirrored_dynamic_tables_update.sh
+ /opt/dwh/mdx-dwh-etl/scripts/dwh_tdp_mirrored_static_tables_truncate_reload.sh
+
+
+[id="1.4.0-RN3"]
+=== Logging configuration parameters eliminated
+
+The configuration parameters:
+
+	DWH_TDP_LOG_JOBLOGCHANNELS_TIMEOUT_IN_DAYS
+	DWH_TDP_LOG_TRANSLOGCHANNELS_TIMEOUT_IN_DAYS
+	
+have been eliminated. These can be removed from the file:
+	
+	/etc/dwh/mdx-dwh-etl/q-free/dwh-qfree.properties
+	
+This will not be done automatically. You will need to modify this file
+using a text editor to make this change. No harm will come from leaving
+these parameters in this file, but this could lead to confusion in the future.
+
+The two lines that are removed can be replaced with the single line:
+	
+	DWH_TDP_LOG_CHANNEL_TIMEOUT_IN_DAYS=180
+
+This line does not need to be present. It is only needed if you want to
+alter the default value of 180 days.
+
+
+[id="1.4.0-RN4"]
+=== Bulk loader configuration parameters eliminated
+
+The configuration parameters that were used for specifying whether or not 
+PostgreSQL "bulk loading" should be be used when mirroring selected tables have 
+been eliminated and are no longer supported. There are fourteen parameters that 
+have been eliminated:
+	
+	DWH_TDP_ARCHIVE_DB_MIRROR_EIP_PASSAGE_RESULT_USE_BL
+	DWH_TDP_ARCHIVE_DB_MIRROR_EIP_IMAGE_RESULT_USE_BL
+	DWH_TDP_ARCHIVE_DB_MIRROR_EIP_AUDITTRAIL_USE_BL
+	DWH_TDP_ARCHIVE_DB_MIRROR_EIP_GROUP_RESULT_USE_BL
+	DWH_TDP_ARCHIVE_DB_MIRROR_FS_FILE_TDP_FILE_USE_BL 
+	DWH_TDP_ARCHIVE_DB_MIRROR_PASSAGE_PASSAGE_USE_BL
+	DWH_TDP_ARCHIVE_DB_MIRROR_PASSAGE_IMAGE_USE_BL
+	DWH_TDP_ARCHIVE_DB_MIRROR_PASSAGE_IMAGE_ALPR_RESULT_USE_BL
+	DWH_TDP_ARCHIVE_DB_MIRROR_PASSAGE_PASSAGE_ALPR_RESULT_USE_BL
+	DWH_TDP_ARCHIVE_DB_MIRROR_PASSAGE_OBU_USE_BL
+	DWH_TDP_ARCHIVE_DB_MIRROR_PASSAGE_OBU_DATA_USE_BL
+	DWH_TDP_ARCHIVE_DB_MIRROR_PASSAGE_FLAG_USE_BL
+	DWH_TDP_ARCHIVE_DB_MIRROR_WORKFLOW_PASSAGE_WORKFLOW_USE_BL
+	DWH_TDP_ARCHIVE_DB_MIRROR_WORKFLOW_ASYNCQUEUE_USE_BL
+
+These parameters should be removed from the file:
+
+	/etc/dwh/mdx-dwh-etl/q-free/dwh-qfree.properties
+
+This will not be done automatically. You will need to modify this file
+using a text editor to make this change. No harm will come from leaving
+these parameters in this file, but this could lead to confusion in the future.
+
+
+[id="1.4.0-RN5"]
+=== Mail configuration properties updated
+
+The default values for the configuration parameters:
+
+	DWH_QF_MAIL_MSG_BODY_SUCCESS
+	DWH_QF_MAIL_MSG_BODY_FAILURE
+
+have been updated in
+
+	/opt/dwh/mdx-dwh-etl/templates/dwh-qfree.properties
+
+The new values are:
+
+	DWH_QF_MAIL_MSG_BODY_SUCCESS=The job "${PARAM_JOB_NAME}" executed successfully.${line.separator}Job ID = ${PARAM_JOB_BATCH_ID}
+	DWH_QF_MAIL_MSG_BODY_FAILURE=The job "${PARAM_JOB_NAME}" failed.${line.separator}Job ID = ${PARAM_JOB_BATCH_ID}
+
+Examine the current values that are assigned to these parameters in the file:
+
+	/etc/dwh/mdx-dwh-etl/q-free/dwh-qfree.properties
+
+and update them manually, if necessary. If you do modify this file, you will 
+need to synchronize it with the master configuration file. This can be done from 
+a shell as follows:
+
+ $ java -jar /opt/dwh/mdx-dwh-etl/pdi_config/dwh_merge_local_properties.jar
+
+If you have already customized these values yourself, you can keep the
+values that you have set. The new values listed here are only sensible defaults.

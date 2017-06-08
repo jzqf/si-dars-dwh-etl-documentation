@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>com.qfree.bo.dars</groupId>
+		<artifactId>dars-pom</artifactId>
+		<version>1.0.0-SNAPSHOT</version>
+	</parent>
+	<artifactId>dars-dwh-etl-documentation</artifactId>
+	<version>0.5.0-SNAPSHOT</version>
+	<packaging>jar</packaging>
+	<name>DARS DWH Documentation</name>
+	<description>Documentation module for dars-dwh-etl module. Builds .adoc files.</description>
+
+	<properties>
+		<snippetsDirectory>${project.build.directory}/documentation-staging/asciidoc/snippets</snippetsDirectory>
+	</properties>
+
+	<build>
+		 <plugins>
+<!--
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<version>2.9</version>
+				<executions>
+					<execution>
+						<id>unpack</id>
+						<phase>initialize</phase>
+						<goals>
+							<goal>unpack</goal>
+						</goals>
+						<configuration>
+							<artifactItems> Unpack all asciidoc folders from dependencies to staging folder
+								<artifactItem>
+									<groupId>com.qfree.bo.na</groupId>
+									<artifactId>dwh-db</artifactId>
+									<overWrite>true</overWrite>
+									<outputDirectory>${project.build.directory}/documentation-staging</outputDirectory>
+									<includes>asciidoc/**/*</includes>
+								</artifactItem>
+							</artifactItems>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+ -->
+			 <plugin>
+				<groupId>org.asciidoctor</groupId>
+				<artifactId>asciidoctor-maven-plugin</artifactId>
+				<version>1.5.5</version>
+				<executions>
+					<execution> <!-- Process all docs in staging folder, ends up in target/generated-docs -->
+						<id>generate-docs</id>
+						<phase>prepare-package</phase>
+						<goals>
+							<goal>process-asciidoc</goal>
+						</goals>
+						<configuration>
+							<sourceHighlighter>coderay</sourceHighlighter>
+							<backend>html</backend>
+							<doctype>book</doctype>
+							<attributes>
+								<snippets>${snippetsDirectory}</snippets>
+								<project-version>${project.version}</project-version>
+							</attributes>
+							<preserveDirectories>true</preserveDirectories>
+						</configuration>
+					</execution>
+				</executions>
+				<configuration>
+					<sourceDirectory>${project.build.directory}/documentation-staging/asciidoc</sourceDirectory>
+					<headerFooter>true</headerFooter>
+					<imagesDir>images</imagesDir>
+				</configuration>
+			</plugin>
+
+			<plugin>
+				<artifactId>maven-resources-plugin</artifactId>
+				<executions>
+					<execution> <!-- Copy generated docs to folder in jar-file, that can be accessed from REST APIs -->
+						<id>copy-resources</id>
+						<phase>prepare-package</phase>
+						<goals>
+							<goal>copy-resources</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>
+								${project.build.outputDirectory}/static/docs
+							</outputDirectory>
+							<resources>
+								<resource>
+									<directory>
+										${project.build.directory}/generated-docs
+									</directory>
+								</resource>
+							</resources>
+						</configuration>
+					</execution>
+					<execution> <!-- Copy local docs to staging folder, pre-generation -->
+						<id>copy-local-docs</id>
+						<phase>initialize</phase>
+						<goals>
+							<goal>copy-resources</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>
+								${project.build.directory}/documentation-staging/asciidoc
+							</outputDirectory>
+							<resources>
+								<resource>
+									<directory>
+										src/main/resources/asciidoc
+									</directory>
+									<excludes>
+										<exclude>*.xlsx</exclude>
+									</excludes>
+								</resource>
+							</resources>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
+		</plugins>
+	</build>
+
+	<dependencies>
+
+		<!-- DWH dependencies -->
+<!--		 <dependency> -->
+<!--			 <groupId>com.qfree.bo.na</groupId> -->
+<!--			 <artifactId>dwh-db</artifactId> -->
+<!--		 </dependency> -->
+
+<!--		 <dependency> -->
+<!--			 <groupId>org.slf4j</groupId> -->
+<!--			 <artifactId>slf4j-api</artifactId> -->
+<!--		 </dependency> -->
+<!--		 <dependency> -->
+<!--			 <groupId>ch.qos.logback</groupId> -->
+<!--			 <artifactId>logback-classic</artifactId> -->
+<!--		 </dependency> -->
+<!--		 <dependency> -->
+<!--			 <groupId>ch.qos.logback</groupId> -->
+<!--			 <artifactId>logback-core</artifactId> -->
+<!--		 </dependency> -->
+<!--		 <dependency> -->
+<!--			 <groupId>org.mockito</groupId> -->
+<!--			 <artifactId>mockito-core</artifactId> -->
+<!--		 </dependency> -->
+<!--		 <dependency> -->
+<!--			 <groupId>org.easytesting</groupId> -->
+<!--			 <artifactId>fest-assert</artifactId> -->
+<!--		 </dependency> -->
+<!--		 <dependency> -->
+<!--			 <groupId>junit</groupId> -->
+<!--			 <artifactId>junit</artifactId> -->
+<!--		 </dependency> -->
+
+	</dependencies>
+</project>
