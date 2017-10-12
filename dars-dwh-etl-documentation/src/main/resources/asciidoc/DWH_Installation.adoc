@@ -7,6 +7,8 @@ TDP data warehouse (DWH). Configuration of this software is covered in another
 document, "Configuration of the TDP data warehouse". The topics covered here 
 include:
 
+//<<DWH_Configuration.adoc#qfree_config_params-section,Nice link text>>
+
 * Prerequisites
 * Software installation procedure
 * Configuration
